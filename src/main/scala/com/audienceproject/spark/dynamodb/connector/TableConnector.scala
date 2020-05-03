@@ -83,7 +83,7 @@ private[dynamodb] class TableConnector(tableName: String, parallelism: Int, para
         val readLimit = readCapacity / parallelism
         val itemLimit = ((bytesPerRCU / avgItemSize * readLimit).toInt * readFactor) max 1
 
-        val writeLimit = if (targetCapacity.toDouble < 1.0) writeCapacity / parallelism  else 9999999999D
+        val writeLimit = if (targetCapacity.toDouble > 0.999) 9999999999D else writeCapacity / parallelism
 
         (keySchema, readLimit, writeLimit, itemLimit, numPartitions)
     }
