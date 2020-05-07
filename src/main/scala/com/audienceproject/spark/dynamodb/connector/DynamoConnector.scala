@@ -30,7 +30,7 @@ import com.amazonaws.services.securitytoken.model.AssumeRoleRequest
 import org.apache.spark.sql.sources.Filter
 import com.amazonaws.retry.PredefinedBackoffStrategies.EqualJitterBackoffStrategy
 import com.amazonaws.retry.RetryPolicy
-import com.amazonaws.PredefinedClientConfigurations
+import com.amazonaws.{ClientConfiguration, PredefinedClientConfigurations}
 
 private[dynamodb] trait DynamoConnector {
 
@@ -45,28 +45,17 @@ private[dynamodb] trait DynamoConnector {
         val chosenRegion = region.getOrElse(properties.getOrElse("aws.dynamodb.region", "us-east-1"))
         val credentials = getCredentials(chosenRegion, roleArn)
 
-        val clientConfiguration = PredefinedClientConfigurations.dynamoDefault()
-
-        /* We go with custom retry policy of retry till 30 seconds */
-        val baseDelayMs = 100 /* 100 MilliSeconds */
-        val maxDelayMs  = 30 * 1000 /* 30 Seconds */
-        val maxRetry    = 30
-        val honorMaxErrorRetryInClientConfig = false
-        val retryPolicy = new RetryPolicy(null,
-            new EqualJitterBackoffStrategy(baseDelayMs, maxDelayMs), maxRetry, honorMaxErrorRetryInClientConfig)
-        clientConfiguration.setRetryPolicy(retryPolicy)
-
         properties.get("aws.dynamodb.endpoint").map(endpoint => {
             AmazonDynamoDBClientBuilder.standard()
                 .withCredentials(credentials)
                 .withEndpointConfiguration(new EndpointConfiguration(endpoint, chosenRegion))
-                .withClientConfiguration(clientConfiguration)
+                .withClientConfiguration(getClientConfiguration)
                 .build()
         }).getOrElse(
             AmazonDynamoDBClientBuilder.standard()
                 .withCredentials(credentials)
                 .withRegion(chosenRegion)
-                .withClientConfiguration(clientConfiguration)
+                .withClientConfiguration(getClientConfiguration)
                 .build()
         )
     }
@@ -75,6 +64,22 @@ private[dynamodb] trait DynamoConnector {
         val chosenRegion = region.getOrElse(properties.getOrElse("aws.dynamodb.region", "us-east-1"))
         val credentials = getCredentials(chosenRegion, roleArn)
 
+        properties.get("aws.dynamodb.endpoint").map(endpoint => {
+            AmazonDynamoDBAsyncClientBuilder.standard()
+                .withCredentials(credentials)
+                .withEndpointConfiguration(new EndpointConfiguration(endpoint, chosenRegion))
+                .withClientConfiguration(getClientConfiguration)
+                .build()
+        }).getOrElse(
+            AmazonDynamoDBAsyncClientBuilder.standard()
+                .withCredentials(credentials)
+                .withRegion(chosenRegion)
+                .withClientConfiguration(getClientConfiguration)
+                .build()
+        )
+    }
+
+    private def getClientConfiguration: ClientConfiguration = {
         val clientConfiguration = PredefinedClientConfigurations.dynamoDefault()
 
         /* We go with custom retry policy of retry till 30 seconds */
@@ -85,20 +90,7 @@ private[dynamodb] trait DynamoConnector {
         val retryPolicy = new RetryPolicy(null,
             new EqualJitterBackoffStrategy(baseDelayMs, maxDelayMs), maxRetry, honorMaxErrorRetryInClientConfig)
         clientConfiguration.setRetryPolicy(retryPolicy)
-
-        properties.get("aws.dynamodb.endpoint").map(endpoint => {
-            AmazonDynamoDBAsyncClientBuilder.standard()
-                .withCredentials(credentials)
-                .withEndpointConfiguration(new EndpointConfiguration(endpoint, chosenRegion))
-                .withClientConfiguration(clientConfiguration)
-                .build()
-        }).getOrElse(
-            AmazonDynamoDBAsyncClientBuilder.standard()
-                .withCredentials(credentials)
-                .withRegion(chosenRegion)
-                .withClientConfiguration(clientConfiguration)
-                .build()
-        )
+        clientConfiguration
     }
 
     /**

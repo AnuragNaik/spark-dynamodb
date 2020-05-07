@@ -80,10 +80,12 @@ private[dynamodb] class TableConnector(tableName: String, parallelism: Int, para
         val readCapacity = readThroughput * targetCapacity
         val writeCapacity = writeThroughput * targetCapacity
 
-        val readLimit = if (targetCapacity.toDouble > 0.999) 9999999999D else readCapacity / parallelism
+        // if targetCapacity is 1 meaning no other application is using the resource, we can avoid rate limiting
+        val readLimit = if (targetCapacity.toDouble > 0.999) Integer.MAX_VALUE else readCapacity / parallelism
         val itemLimit = ((bytesPerRCU / avgItemSize * readLimit).toInt * readFactor) max 1
 
-        val writeLimit = if (targetCapacity.toDouble > 0.999) 9999999999D else writeCapacity / parallelism
+        // if targetCapacity is 1 meaning no other application is using the resource, we can avoid rate limiting
+        val writeLimit = if (targetCapacity.toDouble > 0.999) Integer.MAX_VALUE else writeCapacity / parallelism
 
         (keySchema, readLimit, writeLimit, itemLimit, numPartitions)
     }
